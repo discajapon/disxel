@@ -73,5 +73,36 @@ def write_rows(sheet: str, start: str, rows: list[list[str]]) -> str:
     if any(c0 + len(row) > 26 for row in rows): raise ValueError('Columns go only up to Z')
     return write_cells(sheet, {'%s%d' % (chr(65 + c0 + j), r0 + i + 1): v for i, row in enumerate(rows) for j, v in enumerate(row)})
 
+def unique(b, name, skip=None):
+    v, k = name, 2
+    while any(s is not skip and s['name'] == v for s in b['sheets']): v, k = '%s (%d)' % (name, k), k + 1
+    return v
+
+@mcp.tool()
+def add_sheet(name: str) -> str:
+    """Add an empty sheet at the end. Returns its final name (a number is appended if the name is taken)."""
+    if not name.strip(): raise ValueError('The sheet needs a name')
+    def fn(b):
+        n = unique(b, name.strip()); b['sheets'].append({'name': n, 'cells': {}}); return n
+    return edit(fn)
+
+@mcp.tool()
+def rename_sheet(sheet: str, new_name: str) -> str:
+    """Rename a sheet. Returns its final name."""
+    if not new_name.strip(): raise ValueError('The sheet needs a name')
+    def fn(b):
+        s = find(b, sheet); s['name'] = unique(b, new_name.strip(), s); return s['name']
+    return edit(fn)
+
+@mcp.tool()
+def delete_sheet(sheet: str) -> str:
+    """Delete a sheet and everything in it. Only do this when the user asked for it."""
+    def fn(b):
+        s = find(b, sheet)
+        if len(b['sheets']) == 1: raise ValueError('A book always keeps at least one sheet')
+        b['sheets'].remove(s); b['active'] = min(b.get('active', 0), len(b['sheets']) - 1)
+    edit(fn)
+    return 'Deleted ' + sheet
+
 if __name__ == '__main__':
     mcp.run()
