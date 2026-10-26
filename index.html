@@ -99,7 +99,7 @@ function render(anim){ // ponytail: every row is real DOM; fine to tens of thous
  const s=sheet(),n=Math.max(200,...Object.keys(s.cells).map(k=>+k.slice(1)+20));
  tb.innerHTML=[...Array(n)].map((_,r)=>rowHtml(r,s.cells)).join('');
  R=Math.min(R,n-1);place();renderTabs();
-}
+ if(anim)tb.animate([{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'none'}],{duration:400,easing:'cubic-bezier(.34,1.56,.64,1)'})}
 function place(){const td=cell(R,C),box={top:td.offsetTop+'px',left:td.offsetLeft+'px',width:td.offsetWidth+'px',height:td.offsetHeight+'px'};
  Object.assign($('sel').style,box);if(!mode)Object.assign(ed.style,box);
  const hT=$('hd').offsetHeight,hL=tb.rows[0].cells[0].offsetWidth; // keep the cell clear of the sticky headers
