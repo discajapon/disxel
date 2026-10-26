@@ -37,6 +37,7 @@ table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.92
 td,th{height:30px;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:solid rgba(255,255,255,.12);border-width:0 1px 1px 0}
 td{width:110px;max-width:110px;cursor:cell}
 tr:hover td{background:rgba(255,255,255,.05)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
 th{position:sticky;z-index:2;font-weight:500;font-size:.8em;color:rgba(255,255,255,.75);background:rgba(28,18,52,.85);
  transition:background .25s,color .25s,box-shadow .25s,text-shadow .25s}
 thead th{top:0}
@@ -54,10 +55,28 @@ const $=i=>document.getElementById(i),tb=$('tb'),sc=$('sc');
 const COLS=26,col=c=>String.fromCharCode(65+c),key=(r,c)=>col(c)+(r+1);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>s.replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const load=(k,empty,ok)=>{const raw=localStorage[k];if(!raw)return empty;
+ try{const v=JSON.parse(raw);if(ok(v))return v}catch{}
+ try{localStorage[k+'-corrupt']=raw}catch{} // never overwrite unreadable data without keeping a copy
+ return empty};
+const put=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){console.error('save failed',e)}};
+const plain=v=>v&&typeof v=='object'&&!Array.isArray(v);
+let wb=load('disxcel',null,v=>plain(v)&&Array.isArray(v.sheets));
+wb={active:+wb?.active||0,sheets:(wb?.sheets||[]).filter(plain).map((s,i)=>({name:String(s.name||'Hoja '+(i+1)),
+ cells:Object.fromEntries(Object.entries(plain(s.cells)?s.cells:{}).filter(([k,v])=>/^[A-Z][1-9]\d*$/.test(k)&&v!=null&&v!=='').map(([k,v])=>[k,String(v)]))}))};
+if(!wb.sheets.length)wb.sheets.push({name:'Hoja 1',cells:{}});
+wb.active=clamp(wb.active,0,wb.sheets.length-1);
+const save=()=>put('disxcel',wb),sheet=()=>wb.sheets[wb.active];
+const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
+
 $('hd').innerHTML='<tr><th></th>'+[...Array(COLS)].map((_,c)=>`<th>${col(c)}</th>`).join('')+'</tr>';
 const cell=(r,c)=>tb.rows[r].cells[c+1];
-const rowHtml=(r,cells)=>`<tr><th>${r+1}</th>`+[...Array(COLS)].map((_,c)=>`<td>${esc(cells[key(r,c)]||'')}</td>`).join('')+'</tr>';
-tb.innerHTML=[...Array(200)].map((_,r)=>rowHtml(r,{})).join('');
+const rowHtml=(r,cells)=>`<tr><th>${r+1}</th>`+[...Array(COLS)].map((_,c)=>{const v=cells[key(r,c)]||'';return`<td${isNum(v)?' class=num':''}>${esc(v)}</td>`}).join('')+'</tr>';
+function render(anim){ // ponytail: every row is real DOM; fine to tens of thousands of cells, virtualise if huge sheets get slow
+ const s=sheet(),n=Math.max(200,...Object.keys(s.cells).map(k=>+k.slice(1)+20));
+ tb.innerHTML=[...Array(n)].map((_,r)=>rowHtml(r,s.cells)).join('');
+}
+render();
 const g=document.querySelector('main');
 g.onmousemove=e=>{const r=g.getBoundingClientRect();g.style.setProperty('--mx',e.clientX-r.left+'px');g.style.setProperty('--my',e.clientY-r.top+'px')};
 </script>
