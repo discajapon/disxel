@@ -83,18 +83,14 @@ const $=i=>document.getElementById(i),tb=$('tb'),ed=$('ed'),sc=$('sc');
 const COLS=26,col=c=>String.fromCharCode(65+c),key=(r,c)=>col(c)+(r+1);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>s.replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-const load=(k,empty,ok)=>{const raw=localStorage[k];if(!raw)return empty;
- try{const v=JSON.parse(raw);if(ok(v))return v}catch{}
- try{localStorage[k+'-corrupt']=raw}catch{} // never overwrite unreadable data without keeping a copy
- return empty};
-const put=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){console.error('save failed',e)}};
 const plain=v=>v&&typeof v=='object'&&!Array.isArray(v);
-let wb=load('disxcel',null,v=>plain(v)&&Array.isArray(v.sheets));
-wb={active:+wb?.active||0,sheets:(wb?.sheets||[]).filter(plain).map((s,i)=>({name:String(s.name||'Hoja '+(i+1)),
+const clean=b=>{b={active:+b?.active||0,sheets:(plain(b)&&Array.isArray(b.sheets)?b.sheets:[]).filter(plain).map((s,i)=>({name:String(s.name||'Hoja '+(i+1)),
  cells:Object.fromEntries(Object.entries(plain(s.cells)?s.cells:{}).filter(([k,v])=>/^[A-Z][1-9]\d*$/.test(k)&&v!=null&&v!=='').map(([k,v])=>[k,String(v)]))}))};
-if(!wb.sheets.length)wb.sheets.push({name:'Hoja 1',cells:{}});
-wb.active=clamp(wb.active,0,wb.sheets.length-1);
-const save=()=>put('disxcel',wb),sheet=()=>wb.sheets[wb.active];
+ if(!b.sheets.length)b.sheets.push({name:'Hoja 1',cells:{}});
+ b.active=clamp(b.active,0,b.sheets.length-1);return b};
+let wb=null;try{wb=JSON.parse(window.__book??'null')}catch{} // the launcher injects book.json (and keeps an unreadable one as book.json.corrupt)
+wb=clean(wb);
+const save=()=>window.webkit?.messageHandlers?.book?.postMessage(JSON.stringify(wb)),sheet=()=>wb.sheets[wb.active];
 const uniq=(n,skip)=>{let v=n;for(let k=2;wb.sheets.some((s,j)=>j!==skip&&s.name==v);k++)v=n+' ('+k+')';return v};
 const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
 const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),4000)};
@@ -182,6 +178,7 @@ $('xx').onclick=()=>{stopEdit(true);const b=XLSX.utils.book_new();
  dl('disxcel.xlsx',XLSX.write(b,{type:'array',bookType:'xlsx'}),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');refocus()};
 
 render();refocus();
+function external(t){wb=clean(JSON.parse(t));render()} // book.json changed outside the app, e.g. by the MCP server
 addEventListener('resize',place);
 let idleT; // pause the endless animations after 20 s without input or when unfocused: every frame costs a leaked fd
 const wake=()=>{document.documentElement.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>document.documentElement.classList.add('idle'),20000)};
