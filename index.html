@@ -113,6 +113,7 @@ ed.onkeydown=e=>{if(e.isComposing)return;
  else if(nav&&mode!='edit'){e.preventDefault();stopEdit(true);move(...nav)}
  else if(!mode&&e.key=='F2'){e.preventDefault();startEdit('edit',sheet().cells[key(R,C)]||'')}
  else if(!mode&&(e.key=='Delete'||e.key=='Backspace')){e.preventDefault();setCell(R,C,'')}};
+ed.oncopy=ed.oncut=e=>{if(mode)return;e.preventDefault();e.clipboardData.setData('text/plain',sheet().cells[key(R,C)]||'');if(e.type=='cut')setCell(R,C,'')};
 tb.onpointerdown=e=>{const td=e.target.closest('td');if(!td||e.button)return;e.preventDefault();
  stopEdit(true);R=td.parentNode.sectionRowIndex;C=td.cellIndex-1;place();refocus()};
 tb.ondblclick=e=>{if(e.target.closest('td'))startEdit('edit',sheet().cells[key(R,C)]||'')};
