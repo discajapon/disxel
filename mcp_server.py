@@ -53,5 +53,25 @@ def read_sheet(sheet: str, range: str | None = None) -> dict:
     return {'range': '%s%d:%s%d' % (chr(65 + c0), r0 + 1, chr(65 + c1), r1 + 1), 'rows': rows}
 def range_(a, b): return builtins.range(min(a, b), max(a, b) + 1)  # read_sheet's `range` argument shadows the builtin
 
+@mcp.tool()
+def write_cells(sheet: str, cells: dict[str, str]) -> str:
+    """Set cells, e.g. {"A1": "Total", "B1": "1200"}. An empty string clears the cell."""
+    parsed = {k: ref(k) for k in cells}  # validate everything before touching the file
+    def fn(b):
+        s = find(b, sheet)['cells']
+        for k, v in cells.items():
+            k = '%s%d' % (chr(65 + parsed[k][0]), parsed[k][1] + 1); v = str(v).strip()
+            if v: s[k] = v
+            else: s.pop(k, None)
+    edit(fn)
+    return 'Wrote %d cells in %s' % (len(cells), sheet)
+
+@mcp.tool()
+def write_rows(sheet: str, start: str, rows: list[list[str]]) -> str:
+    """Write a block of rows starting at the cell start (e.g. "A1"), like pasting a table. '' clears a cell."""
+    c0, r0 = ref(start)
+    if any(c0 + len(row) > 26 for row in rows): raise ValueError('Columns go only up to Z')
+    return write_cells(sheet, {'%s%d' % (chr(65 + c0 + j), r0 + i + 1): v for i, row in enumerate(rows) for j, v in enumerate(row)})
+
 if __name__ == '__main__':
     mcp.run()
