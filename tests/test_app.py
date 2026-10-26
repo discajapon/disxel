@@ -9,6 +9,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = tempfile.mkdtemp(prefix='disxcel-test-')
 os.environ['DISXCEL_DATA'] = TMP + '/data'
 os.makedirs(TMP + '/Downloads')
+os.makedirs(TMP + '/data')
+open(TMP + '/data/book.json', 'w').write('{broken')  # the app must keep a copy, not lose it
+sys.path.insert(0, ROOT)
+import mcp_server
 import gi
 gi.require_version('Gtk', '3.0'); gi.require_version('WebKit2', '4.1')
 from gi.repository import Gtk, WebKit2, GLib
@@ -43,7 +47,6 @@ def xlsx_b64():  # data starting at B3, as real files often do
     b.create_sheet('Ingresos')['A1'] = 'Sueldo'
     f = io.BytesIO(); b.save(f); return base64.b64encode(f.getvalue()).decode()
 
-SEED = "localStorage['disxcel']='{broken';1"
 EDIT = """(()=>{const kd=(k,o={})=>ed.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,...o}));
  ed.value='hola';ed.dispatchEvent(new InputEvent('input',{bubbles:true}));const editing=ed.classList.contains('on');kd('Enter');
  const after={editing,R,C,a1:sheet().cells.A1};
@@ -62,11 +65,11 @@ DELETE = """(()=>{document.querySelector('#tabs [data-i="1"]').click();const x=(
 IMPORT = """(()=>{const b=Uint8Array.from(atob('%s'),c=>c.charCodeAt(0)),dt=new DataTransfer();
  dt.items.add(new File([b],'libro.xlsx'));$('fi').files=dt.files;$('fi').dispatchEvent(new Event('change'));return 1})()"""
 EXPORT = "$('xc').click();setTimeout(()=>$('xx').click(),600);1"
-STATE = "{names:wb.sheets.map(s=>s.name),sheets:wb.sheets.map(s=>s.cells),active:wb.active,corrupt:localStorage['disxcel-corrupt']||null,shown:cell(2,1).textContent}"
+STATE = "{names:wb.sheets.map(s=>s.name),sheets:wb.sheets.map(s=>s.cells),active:wb.active,shown:cell(2,1).textContent}"
 
 def phase2():
     def first(o):
-        check('corrupt data survives as a copy', o['corrupt'] == '{broken', o['corrupt'])
+        check('corrupt book survives as a copy', open(TMP + '/data/book.json.corrupt').read() == '{broken')
         check('app boots with one empty sheet', o['names'] == ['Hoja 1'] and o['sheets'] == [{}], o)
     jsj(STATE, first)
     def edit(o):
@@ -96,6 +99,11 @@ def phase2():
         js(EXPORT)
     at(2800, export)
     at(4500, exported)
+    at(5000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
+    def live(o):
+        check('an MCP write shows up in the open app', o['sheets'][0].get('A1') == 'desde Claude' and o['sheets'][0].get('D9') == 'x'
+              and o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['active'] == 1, o['sheets'][0])
+    at(7000, lambda: jsj(STATE, live))
     pid = web_pid(); lim = [l for l in open(f'/proc/{pid}/limits') if l.startswith('Max open files')][0].split()
     check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3])
     for t in range(30000, 43000, 3000): at(t, lambda: samples.append(syncs(pid)))  # animations pause after 20 s idle
@@ -111,7 +119,7 @@ def exported():
 samples = []
 def finish():
     def persisted(o):
-        check('everything survives a reload', o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['sheets'][0].get('A1') == 'z' and o['active'] == 1, o['names'])
+        check('everything survives a reload', o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['sheets'][0].get('A1') == 'desde Claude' and o['active'] == 1, o['names'])
         last = samples[-3:]  # once idle the count must hold still
         check('no fence fds leak while idle', max(last) - min(last) <= 5, samples)
         check('fd count stays far from the limit', max(samples) < 900, max(samples))
@@ -125,9 +133,8 @@ def lu(self, uri):
     def done(v, e):
         if e != WebKit2.LoadEvent.FINISHED: return
         state[0] += 1
-        if state[0] == 1: js(SEED, lambda r: v.reload())
-        elif state[0] == 2: at(800, phase2)
-        elif state[0] == 3: at(800, finish)
+        if state[0] == 1: at(800, phase2)
+        elif state[0] == 2: at(800, finish)
     self.connect('load-changed', done)
     orig(self, uri)
 WebKit2.WebView.load_uri = lu
