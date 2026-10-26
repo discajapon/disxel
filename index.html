@@ -30,6 +30,7 @@ button,input{font:inherit;color:inherit}
 button{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45);border-radius:14px;padding:6px 12px;cursor:pointer;box-shadow:inset 0 1px 1px rgba(255,255,255,.5);transition:transform .25s cubic-bezier(.34,1.56,.64,1),background .25s,box-shadow .25s}
 button:hover{background:rgba(255,255,255,.38);transform:translateY(-2px) scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.3),inset 0 1px 1px rgba(255,255,255,.7)}
 button:active{transform:scale(.9)}
+#ref{min-width:60px;text-align:center;padding:6px 12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.3);font-variant-numeric:tabular-nums}
 .sc{flex:1;overflow:auto;border-radius:18px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.25)}
 .sc::-webkit-scrollbar{width:8px;height:8px}.sc::-webkit-scrollbar-thumb{background:rgba(255,255,255,.3);border-radius:8px}.sc::-webkit-scrollbar-corner{background:none}
 .in{position:relative;width:max-content}
@@ -43,11 +44,16 @@ th{position:sticky;z-index:2;font-weight:500;font-size:.8em;color:rgba(255,255,2
 thead th{top:0}
 tbody th{left:0;width:46px;text-align:right}
 thead th:first-child{left:0;z-index:3}
+th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(255,255,255,.35);text-shadow:0 0 10px rgba(255,255,255,.9),0 1px 3px rgba(0,0,0,.6)}
+#sel{position:absolute;z-index:1;pointer-events:none;border-radius:8px;border:1.5px solid rgba(255,255,255,.9);background:rgba(255,255,255,.12);
+ box-shadow:0 0 18px rgba(255,255,255,.45),inset 0 1px 1px rgba(255,255,255,.7);
+ transition:top .28s cubic-bezier(.34,1.56,.64,1),left .28s cubic-bezier(.34,1.56,.64,1),width .28s,height .28s}
 </style>
 <main class="glass">
-<header><h1>Disxcel</h1></header>
+<header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span></header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
+ <div id=sel></div>
 </div></div>
 </main>
 <script>
@@ -72,11 +78,25 @@ const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
 $('hd').innerHTML='<tr><th></th>'+[...Array(COLS)].map((_,c)=>`<th>${col(c)}</th>`).join('')+'</tr>';
 const cell=(r,c)=>tb.rows[r].cells[c+1];
 const rowHtml=(r,cells)=>`<tr><th>${r+1}</th>`+[...Array(COLS)].map((_,c)=>{const v=cells[key(r,c)]||'';return`<td${isNum(v)?' class=num':''}>${esc(v)}</td>`}).join('')+'</tr>';
+let R=0,C=0;
 function render(anim){ // ponytail: every row is real DOM; fine to tens of thousands of cells, virtualise if huge sheets get slow
  const s=sheet(),n=Math.max(200,...Object.keys(s.cells).map(k=>+k.slice(1)+20));
  tb.innerHTML=[...Array(n)].map((_,r)=>rowHtml(r,s.cells)).join('');
+ R=Math.min(R,n-1);place()
 }
+function place(){const td=cell(R,C),box={top:td.offsetTop+'px',left:td.offsetLeft+'px',width:td.offsetWidth+'px',height:td.offsetHeight+'px'};
+ Object.assign($('sel').style,box);
+ const hT=$('hd').offsetHeight,hL=tb.rows[0].cells[0].offsetWidth; // keep the cell clear of the sticky headers
+ if(td.offsetTop-hT<sc.scrollTop)sc.scrollTop=td.offsetTop-hT;else if(td.offsetTop+td.offsetHeight>sc.scrollTop+sc.clientHeight)sc.scrollTop=td.offsetTop+td.offsetHeight-sc.clientHeight;
+ if(td.offsetLeft-hL<sc.scrollLeft)sc.scrollLeft=td.offsetLeft-hL;else if(td.offsetLeft+td.offsetWidth>sc.scrollLeft+sc.clientWidth)sc.scrollLeft=td.offsetLeft+td.offsetWidth-sc.clientWidth;
+ document.querySelectorAll('th.on').forEach(t=>t.classList.remove('on'));
+ $('hd').rows[0].cells[C+1].classList.add('on');tb.rows[R].cells[0].classList.add('on');
+ $('ref').textContent=key(R,C)}
+const move=(dr,dc)=>{R=clamp(R+dr,0,tb.rows.length-1);C=clamp(C+dc,0,COLS-1);place()};
+addEventListener('keydown',e=>{const nav={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];if(nav){e.preventDefault();move(...nav)}});
+tb.onpointerdown=e=>{const td=e.target.closest('td');if(!td||e.button)return;R=td.parentNode.sectionRowIndex;C=td.cellIndex-1;place()};
 render();
+addEventListener('resize',place);
 const g=document.querySelector('main');
 g.onmousemove=e=>{const r=g.getBoundingClientRect();g.style.setProperty('--mx',e.clientX-r.left+'px');g.style.setProperty('--my',e.clientY-r.top+'px')};
 </script>
