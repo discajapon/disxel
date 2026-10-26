@@ -1,0 +1,33 @@
+# Disxcel
+
+A small spreadsheet for Ubuntu with a liquid glass look, sibling of [Disctask](https://github.com/discajapon/Disctask). Values only, no formulas.
+
+## Use
+- Click a cell and type; Enter/Tab save and move down/right (Shift goes back), Escape cancels, arrows move.
+- F2 or double click edits the current text; Delete clears the cell. Ctrl+C / Ctrl+X / Ctrl+V work on the cell.
+- Pasting a range copied from Excel, LibreOffice or a web table spreads it over the grid.
+- Tabs at the bottom: ＋ adds a sheet, double click renames it, ✕ twice deletes it.
+- Columns go A–Z; rows grow as you go.
+
+## Files
+- 📂 Abrir reads `.xlsx`, `.xls`, `.ods` or `.csv`; each sheet becomes a new tab (cells keep their place, values come in as displayed text).
+- ⬇ CSV saves the current sheet, ⬇ .xlsx saves the whole book (plain numbers stay numbers). Both go to `~/Downloads` and never overwrite an existing file.
+- Uses the bundled [SheetJS](https://sheetjs.com) 0.20.3 (`xlsx.full.min.js`, Apache-2.0); nothing touches the network.
+
+## Run
+Needs GTK3 + WebKit2GTK (`gir1.2-webkit2-4.1`).
+
+    ./disxcel.py
+
+Data lives in the WebView's localStorage under `~/.local/share/disxcel`. If it is ever unreadable it is kept as `disxcel-corrupt` instead of being overwritten.
+
+Like Disctask, the app forces WebKit's GPU renderer when OpenGL works (`WEBKIT_FORCE_DMABUF_RENDERER=0 ./disxcel.py` to opt out). That renderer leaks one fd per frame, so the launcher raises the fd limit, endless animations pause after 20 s idle or when unfocused, and a dead web process is reloaded.
+
+## Tests
+`python3 tests/test_app.py` runs the real app on a throwaway data dir and a throwaway `~/Downloads` (needs a display and `python3-openpyxl`, ~50 s).
+
+## Font
+Anthropic Serif, not in the repo: install it system-wide or drop the `.otf` files into `fonts/` (ignored by git). Falls back to Georgia.
+
+## Launcher
+Copy `disxcel.desktop` to `~/.local/share/applications/` and replace `/path/to/disxcel` with the real path.
