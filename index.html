@@ -52,6 +52,9 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 #ed:not(.on){pointer-events:none} /* clicks reach the cell underneath */
 #ed.on{opacity:1;caret-color:auto;border-radius:10px;background:rgba(30,20,50,.88);
  box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(255,255,255,.4),0 8px 20px rgba(0,0,0,.4);animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+#toast{position:fixed;z-index:10;bottom:28px;left:50%;translate:-50% 20px;opacity:0;padding:10px 18px;border-radius:18px;pointer-events:none;
+ text-shadow:0 1px 3px rgba(0,0,0,.6);transition:opacity .35s,translate .45s cubic-bezier(.34,1.56,.64,1)}
+#toast.on{opacity:1;translate:-50% 0}
 </style>
 <main class="glass">
 <header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span></header>
@@ -60,6 +63,7 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
  <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
 </div></div>
 </main>
+<div id=toast class=glass></div>
 <script>
 const $=i=>document.getElementById(i),tb=$('tb'),ed=$('ed'),sc=$('sc');
 const COLS=26,col=c=>String.fromCharCode(65+c),key=(r,c)=>col(c)+(r+1);
@@ -78,6 +82,7 @@ if(!wb.sheets.length)wb.sheets.push({name:'Hoja 1',cells:{}});
 wb.active=clamp(wb.active,0,wb.sheets.length-1);
 const save=()=>put('disxcel',wb),sheet=()=>wb.sheets[wb.active];
 const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
+const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),4000)};
 
 $('hd').innerHTML='<tr><th></th>'+[...Array(COLS)].map((_,c)=>`<th>${col(c)}</th>`).join('')+'</tr>';
 const cell=(r,c)=>tb.rows[r].cells[c+1];
@@ -114,6 +119,12 @@ ed.onkeydown=e=>{if(e.isComposing)return;
  else if(!mode&&e.key=='F2'){e.preventDefault();startEdit('edit',sheet().cells[key(R,C)]||'')}
  else if(!mode&&(e.key=='Delete'||e.key=='Backspace')){e.preventDefault();setCell(R,C,'')}};
 ed.oncopy=ed.oncut=e=>{if(mode)return;e.preventDefault();e.clipboardData.setData('text/plain',sheet().cells[key(R,C)]||'');if(e.type=='cut')setCell(R,C,'')};
+ed.onpaste=e=>{const t=e.clipboardData.getData('text/plain').replace(/\r/g,'').replace(/\n$/,'');
+ if(mode&&!/[\t\n]/.test(t))return; // plain text inside a cell being edited
+ e.preventDefault();stopEdit(false);paste(t)};
+function paste(t){let cut=0;const s=sheet(); // tab/newline separated, as Excel and browsers copy cell ranges
+ t.split('\n').forEach((line,i)=>line.split('\t').forEach((v,j)=>{if(C+j>=COLS){cut++;return}const k=key(R+i,C+j);v=v.trim();if(v)s.cells[k]=v;else delete s.cells[k]}));
+ save();render();if(cut)toast(`Solo caben 26 columnas (A–Z): ${cut} celdas quedaron fuera`)}
 tb.onpointerdown=e=>{const td=e.target.closest('td');if(!td||e.button)return;e.preventDefault();
  stopEdit(true);R=td.parentNode.sectionRowIndex;C=td.cellIndex-1;place();refocus()};
 tb.ondblclick=e=>{if(e.target.closest('td'))startEdit('edit',sheet().cells[key(R,C)]||'')};
