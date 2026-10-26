@@ -19,12 +19,19 @@ Needs GTK3 + WebKit2GTK (`gir1.2-webkit2-4.1`).
 
     ./disxcel.py
 
-Data lives in the WebView's localStorage under `~/.local/share/disxcel`. If it is ever unreadable it is kept as `disxcel-corrupt` instead of being overwritten.
+The book lives in `~/.local/share/disxcel/book.json`, saved on every change. If it is ever unreadable it is kept as `book.json.corrupt` instead of being lost. When something else changes the file (the MCP server below), an open window shows the change within a second.
 
 Like Disctask, the app forces WebKit's GPU renderer when OpenGL works (`WEBKIT_FORCE_DMABUF_RENDERER=0 ./disxcel.py` to opt out). That renderer leaks one fd per frame, so the launcher raises the fd limit, endless animations pause after 20 s idle or when unfocused, and a dead web process is reloaded.
 
+## MCP server (Claude)
+`mcp_server.py` lets Claude read and edit the book: `list_sheets`, `read_sheet` (whole used area or a range like `A1:D20`), `write_cells` (`{"B3": "1200"}`, `""` clears), `write_rows` (a table from a start cell), `add_sheet`, `rename_sheet`, `delete_sheet`. It works whether Disxcel is open or not. Needs the `mcp` Python package (`pip install --user mcp`).
+
+    claude mcp add -s user disxcel -- python3 /path/to/disxcel/mcp_server.py
+
+App and server share a lock for each write; if you type in a cell in the very second Claude writes, the last write wins.
+
 ## Tests
-`python3 tests/test_app.py` runs the real app on a throwaway data dir and a throwaway `~/Downloads` (needs a display and `python3-openpyxl`, ~50 s).
+`python3 tests/test_app.py` runs the real app on a throwaway data dir and a throwaway `~/Downloads` (needs a display and `python3-openpyxl`, ~50 s), including an MCP write while it is open. `python3 tests/test_mcp.py` checks the MCP tools, also over stdio (a few seconds).
 
 ## Font
 Anthropic Serif, not in the repo: install it system-wide or drop the `.otf` files into `fonts/` (ignored by git). Falls back to Georgia.
