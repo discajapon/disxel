@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Disxcel
+Exec=/path/to/disxcel/disxcel.py
+Icon=/path/to/disxcel/icon.png
+Terminal=false
+Categories=Office;Spreadsheet;
+StartupWMClass=disxcel
