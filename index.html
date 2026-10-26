@@ -66,7 +66,9 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 #toast.on{opacity:1;translate:-50% 0}
 </style>
 <main class="glass">
-<header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span></header>
+<header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span>
+ <button id=op title="Abrir .xlsx, .ods o .csv (cada hoja entra como pestaña nueva)">📂 Abrir</button><input type=file id=fi accept=".xlsx,.xls,.ods,.csv" hidden>
+ </header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
  <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
@@ -74,6 +76,7 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 <nav id=tabs></nav>
 </main>
 <div id=toast class=glass></div>
+<script src="xlsx.full.min.js"></script>
 <script>
 const $=i=>document.getElementById(i),tb=$('tb'),ed=$('ed'),sc=$('sc');
 const COLS=26,col=c=>String.fromCharCode(65+c),key=(r,c)=>col(c)+(r+1);
@@ -156,6 +159,17 @@ $('tabs').ondblclick=e=>{const b=e.target.closest('button[data-i]');if(!b||e.tar
  const i=+b.dataset.i,inp=document.createElement('input');inp.value=wb.sheets[i].name;b.replaceWith(inp);inp.focus();inp.select();
  let done=false;const end=ok=>{if(done)return;done=true;const v=inp.value.trim();if(ok&&v)wb.sheets[i].name=uniq(v,i);save();renderTabs();refocus()};
  inp.onkeydown=e=>{if(e.key=='Enter')end(true);if(e.key=='Escape')end(false)};inp.onblur=()=>end(true)};
+
+$('op').onclick=()=>$('fi').click();
+$('fi').onchange=async()=>{const f=$('fi').files[0];$('fi').value='';if(!f)return;
+ try{const x=/\.csv$/i.test(f.name)?XLSX.read(await f.text(),{type:'string'}):XLSX.read(await f.arrayBuffer()),first=wb.sheets.length;let cut=0;
+  for(const n of x.SheetNames){const ws=x.Sheets[n],cells={},o=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s:{r:0,c:0};
+   XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:'',blankrows:true}).forEach((row,r)=>row.forEach((v,c)=>{
+    v=String(v);if(!v)return;if(o.c+c>=COLS){cut++;return}cells[key(o.r+r,o.c+c)]=v}));
+   wb.sheets.push({name:uniq(/\.csv$/i.test(f.name)?f.name.replace(/\.csv$/i,''):n),cells})}
+  if(wb.sheets.length==first)throw 0;
+  open(first);if(cut)toast(`Solo caben 26 columnas (A–Z): ${cut} celdas no se importaron`)}
+ catch(err){console.error(err);toast('No se pudo abrir '+f.name)}};
 
 render();refocus();
 addEventListener('resize',place);
