@@ -68,7 +68,7 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 <main class="glass">
 <header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span>
  <button id=op title="Abrir .xlsx, .ods o .csv (cada hoja entra como pestaña nueva)">📂 Abrir</button><input type=file id=fi accept=".xlsx,.xls,.ods,.csv" hidden>
- </header>
+ <button id=xc title="Exportar la hoja actual">⬇ CSV</button></header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
  <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
@@ -170,6 +170,10 @@ $('fi').onchange=async()=>{const f=$('fi').files[0];$('fi').value='';if(!f)retur
   if(wb.sheets.length==first)throw 0;
   open(first);if(cut)toast(`Solo caben 26 columnas (A–Z): ${cut} celdas no se importaron`)}
  catch(err){console.error(err);toast('No se pudo abrir '+f.name)}};
+const aoa=(s,typed)=>{const a=[];for(const[k,v]of Object.entries(s.cells))(a[+k.slice(1)-1]??=[])[k.charCodeAt(0)-65]=typed&&/^-?(0|[1-9]\d*)(\.\d+)?$/.test(v)?+v:v;
+ return Array.from(a,row=>Array.from(row??[],v=>v??''))};
+const dl=(name,data,type)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click()};
+$('xc').onclick=()=>{stopEdit(true);dl(sheet().name.replace(/[\/\\]/g,'_')+'.csv','﻿'+XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(aoa(sheet()))),'text/csv');refocus()}; // BOM: Excel reads the accents as UTF-8
 
 render();refocus();
 addEventListener('resize',place);
