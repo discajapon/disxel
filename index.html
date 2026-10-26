@@ -48,16 +48,20 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 #sel{position:absolute;z-index:1;pointer-events:none;border-radius:8px;border:1.5px solid rgba(255,255,255,.9);background:rgba(255,255,255,.12);
  box-shadow:0 0 18px rgba(255,255,255,.45),inset 0 1px 1px rgba(255,255,255,.7);
  transition:top .28s cubic-bezier(.34,1.56,.64,1),left .28s cubic-bezier(.34,1.56,.64,1),width .28s,height .28s}
+#ed{position:absolute;z-index:1;padding:0 8px;border:0;outline:none;font-size:.92em;background:transparent;opacity:0;caret-color:transparent;text-shadow:inherit}
+#ed:not(.on){pointer-events:none} /* clicks reach the cell underneath */
+#ed.on{opacity:1;caret-color:auto;border-radius:10px;background:rgba(30,20,50,.88);
+ box-shadow:0 0 0 2px rgba(255,255,255,.7),0 0 24px rgba(255,255,255,.4),0 8px 20px rgba(0,0,0,.4);animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
 </style>
 <main class="glass">
 <header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span></header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
- <div id=sel></div>
+ <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
 </div></div>
 </main>
 <script>
-const $=i=>document.getElementById(i),tb=$('tb'),sc=$('sc');
+const $=i=>document.getElementById(i),tb=$('tb'),ed=$('ed'),sc=$('sc');
 const COLS=26,col=c=>String.fromCharCode(65+c),key=(r,c)=>col(c)+(r+1);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>s.replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
@@ -78,14 +82,14 @@ const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
 $('hd').innerHTML='<tr><th></th>'+[...Array(COLS)].map((_,c)=>`<th>${col(c)}</th>`).join('')+'</tr>';
 const cell=(r,c)=>tb.rows[r].cells[c+1];
 const rowHtml=(r,cells)=>`<tr><th>${r+1}</th>`+[...Array(COLS)].map((_,c)=>{const v=cells[key(r,c)]||'';return`<td${isNum(v)?' class=num':''}>${esc(v)}</td>`}).join('')+'</tr>';
-let R=0,C=0;
+let R=0,C=0,mode=null; // mode: null = just selected, 'type' = typing replaced the cell, 'edit' = F2/double click (arrows move the caret)
 function render(anim){ // ponytail: every row is real DOM; fine to tens of thousands of cells, virtualise if huge sheets get slow
  const s=sheet(),n=Math.max(200,...Object.keys(s.cells).map(k=>+k.slice(1)+20));
  tb.innerHTML=[...Array(n)].map((_,r)=>rowHtml(r,s.cells)).join('');
  R=Math.min(R,n-1);place()
 }
 function place(){const td=cell(R,C),box={top:td.offsetTop+'px',left:td.offsetLeft+'px',width:td.offsetWidth+'px',height:td.offsetHeight+'px'};
- Object.assign($('sel').style,box);
+ Object.assign($('sel').style,box);if(!mode)Object.assign(ed.style,box);
  const hT=$('hd').offsetHeight,hL=tb.rows[0].cells[0].offsetWidth; // keep the cell clear of the sticky headers
  if(td.offsetTop-hT<sc.scrollTop)sc.scrollTop=td.offsetTop-hT;else if(td.offsetTop+td.offsetHeight>sc.scrollTop+sc.clientHeight)sc.scrollTop=td.offsetTop+td.offsetHeight-sc.clientHeight;
  if(td.offsetLeft-hL<sc.scrollLeft)sc.scrollLeft=td.offsetLeft-hL;else if(td.offsetLeft+td.offsetWidth>sc.scrollLeft+sc.clientWidth)sc.scrollLeft=td.offsetLeft+td.offsetWidth-sc.clientWidth;
@@ -93,9 +97,27 @@ function place(){const td=cell(R,C),box={top:td.offsetTop+'px',left:td.offsetLef
  $('hd').rows[0].cells[C+1].classList.add('on');tb.rows[R].cells[0].classList.add('on');
  $('ref').textContent=key(R,C)}
 const move=(dr,dc)=>{R=clamp(R+dr,0,tb.rows.length-1);C=clamp(C+dc,0,COLS-1);place()};
-addEventListener('keydown',e=>{const nav={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];if(nav){e.preventDefault();move(...nav)}});
-tb.onpointerdown=e=>{const td=e.target.closest('td');if(!td||e.button)return;R=td.parentNode.sectionRowIndex;C=td.cellIndex-1;place()};
-render();
+function setCell(r,c,v){const s=sheet(),k=key(r,c);if(v==='')delete s.cells[k];else s.cells[k]=v;
+ const td=cell(r,c);td.textContent=v;td.classList.toggle('num',isNum(v));save()}
+const refocus=()=>ed.focus({preventScroll:true});
+const fit=()=>{const w=cell(R,C).offsetWidth;ed.style.width=w+'px';if(ed.scrollWidth>ed.clientWidth)ed.style.width=Math.min(ed.scrollWidth+16,480)+'px'};
+function startEdit(m,v){mode=m;if(v!=null){ed.value=v;ed.setSelectionRange(v.length,v.length)}ed.classList.add('on');fit()}
+function stopEdit(commit){if(!mode)return;if(commit)setCell(R,C,ed.value);mode=null;ed.value='';ed.classList.remove('on');place()}
+ed.oninput=()=>{if(!mode)startEdit('type');fit()}; // the always-focused editor catches typing, so dead keys and IME work
+ed.onblur=()=>stopEdit(true);
+ed.onkeydown=e=>{if(e.isComposing)return;
+ const nav={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key],b=e.shiftKey?-1:1;
+ if(e.key=='Enter'||e.key=='Tab'){e.preventDefault();stopEdit(true);e.key=='Enter'?move(b,0):move(0,b)}
+ else if(e.key=='Escape'){if(mode){e.preventDefault();stopEdit(false)}}
+ else if(nav&&mode!='edit'){e.preventDefault();stopEdit(true);move(...nav)}
+ else if(!mode&&e.key=='F2'){e.preventDefault();startEdit('edit',sheet().cells[key(R,C)]||'')}
+ else if(!mode&&(e.key=='Delete'||e.key=='Backspace')){e.preventDefault();setCell(R,C,'')}};
+tb.onpointerdown=e=>{const td=e.target.closest('td');if(!td||e.button)return;e.preventDefault();
+ stopEdit(true);R=td.parentNode.sectionRowIndex;C=td.cellIndex-1;place();refocus()};
+tb.ondblclick=e=>{if(e.target.closest('td'))startEdit('edit',sheet().cells[key(R,C)]||'')};
+addEventListener('pointerup',()=>{if(document.activeElement==document.body)refocus()}); // clicks on headers/scrollbars must not strand the keyboard
+
+render();refocus();
 addEventListener('resize',place);
 const g=document.querySelector('main');
 g.onmousemove=e=>{const r=g.getBoundingClientRect();g.style.setProperty('--mx',e.clientX-r.left+'px');g.style.setProperty('--my',e.clientY-r.top+'px')};
