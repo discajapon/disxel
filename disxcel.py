@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import gi, os, resource
+import gi, os, resource, json
+import book
 gi.require_version('Gtk','3.0'); gi.require_version('WebKit2','4.1')
 from gi.repository import Gtk, WebKit2, GLib
 # WebKit's forced GPU renderer leaks one sync_file fd per presented frame (~15/s while
@@ -15,7 +16,7 @@ def gl_ok():  # forcing the GPU renderer aborts the app when GDK has no OpenGL, 
 # WebKitGTK falls back to CPU painting on some GPUs (NVIDIA here: ~12 fps with the glass
 # effects); force the GPU renderer. WEBKIT_FORCE_DMABUF_RENDERER=0 ./disxcel.py to opt out.
 if gl_ok(): os.environ.setdefault('WEBKIT_FORCE_DMABUF_RENDERER', '1')
-d = os.environ.get('DISXCEL_DATA') or os.path.expanduser('~/.local/share/disxcel')  # override for tests
+d = book.DIR
 ctx = WebKit2.WebContext.new_with_website_data_manager(
     WebKit2.WebsiteDataManager(base_data_directory=d, base_cache_directory=d))
 def save(dl, name):  # exports land in ~/Downloads, never overwriting
@@ -35,7 +36,30 @@ def policy(v, dec, kind):  # web links open in the default browser, not inside t
             return True
     return False
 v.connect('decide-policy', policy)
-v.connect('web-process-terminated', lambda v, why: v.reload())  # data lives in localStorage, a reload loses nothing
+v.connect('web-process-terminated', lambda v, why: v.reload())  # the book is saved on every change, a reload loses nothing
+m = v.get_user_content_manager()
+def inject(text):  # the page reads the book from window.__book when it loads (also after a crash reload)
+    m.remove_all_scripts()
+    m.add_script(WebKit2.UserScript('window.__book=' + json.dumps(text), WebKit2.UserContentInjectedFrames.TOP_FRAME,
+                                    WebKit2.UserScriptInjectionTime.START, None, None))
+last = [book.read(), None]  # [text we last wrote or showed, mtime we last saw]
+inject(last[0])
+def saved(m, res):
+    text = res.get_js_value().to_string()
+    with book.locked(): book.write(text)
+    last[0] = text; inject(text)
+m.register_script_message_handler('book')
+m.connect('script-message-received::book', saved)
+# ponytail: last writer wins inside the 1 s poll window (typing in the same second as an MCP write); merge per cell if that ever bites
+def poll():  # book.json changed outside the app (the MCP server): show it
+    try: mt = os.stat(book.PATH).st_mtime_ns
+    except FileNotFoundError: return True
+    if mt != last[1]:
+        last[1] = mt; t = book.read()
+        if t is not None and t != last[0]:
+            last[0] = t; inject(t); v.run_javascript('external(%s)' % json.dumps(t), None, None)
+    return True
+GLib.timeout_add(1000, poll)
 v.load_uri('file://' + os.path.join(os.path.dirname(os.path.realpath(__file__)), 'index.html'))
 w = Gtk.Window(title='Disxcel', default_width=1100, default_height=720)
 w.set_icon_from_file(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icon.png'))
