@@ -82,6 +82,7 @@ const isNum=v=>/^[-+]?[\d.,]*\d[\d.,]*%?$/.test(v.trim());
 $('hd').innerHTML='<tr><th></th>'+[...Array(COLS)].map((_,c)=>`<th>${col(c)}</th>`).join('')+'</tr>';
 const cell=(r,c)=>tb.rows[r].cells[c+1];
 const rowHtml=(r,cells)=>`<tr><th>${r+1}</th>`+[...Array(COLS)].map((_,c)=>{const v=cells[key(r,c)]||'';return`<td${isNum(v)?' class=num':''}>${esc(v)}</td>`}).join('')+'</tr>';
+const grow=n=>tb.insertAdjacentHTML('beforeend',[...Array(n)].map((_,i)=>rowHtml(tb.rows.length+i,{})).join(''));
 let R=0,C=0,mode=null; // mode: null = just selected, 'type' = typing replaced the cell, 'edit' = F2/double click (arrows move the caret)
 function render(anim){ // ponytail: every row is real DOM; fine to tens of thousands of cells, virtualise if huge sheets get slow
  const s=sheet(),n=Math.max(200,...Object.keys(s.cells).map(k=>+k.slice(1)+20));
@@ -96,7 +97,7 @@ function place(){const td=cell(R,C),box={top:td.offsetTop+'px',left:td.offsetLef
  document.querySelectorAll('th.on').forEach(t=>t.classList.remove('on'));
  $('hd').rows[0].cells[C+1].classList.add('on');tb.rows[R].cells[0].classList.add('on');
  $('ref').textContent=key(R,C)}
-const move=(dr,dc)=>{R=clamp(R+dr,0,tb.rows.length-1);C=clamp(C+dc,0,COLS-1);place()};
+const move=(dr,dc)=>{R=Math.max(0,R+dr);C=clamp(C+dc,0,COLS-1);if(R>=tb.rows.length-1)grow(50);place()};
 function setCell(r,c,v){const s=sheet(),k=key(r,c);if(v==='')delete s.cells[k];else s.cells[k]=v;
  const td=cell(r,c);td.textContent=v;td.classList.toggle('num',isNum(v));save()}
 const refocus=()=>ed.focus({preventScroll:true});
