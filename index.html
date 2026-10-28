@@ -69,7 +69,7 @@ html.idle *,html.idle *::before,html.idle *::after{animation-play-state:paused!i
 <main class="glass">
 <header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span>
  <button id=op title="Abrir .xlsx, .ods o .csv (cada hoja entra como pestaña nueva)">📂 Abrir</button><input type=file id=fi accept=".xlsx,.xls,.ods,.csv" hidden>
- <button id=xc title="Exportar la hoja actual">⬇ CSV</button><button id=xx title="Exportar todas las hojas">⬇ .xlsx</button></header>
+ <button id=xc title="Exportar la hoja actual">⬇ CSV</button><button id=xx title="Exportar todas las hojas a Excel 97–2003">⬇ .xls</button></header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
  <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
@@ -175,8 +175,7 @@ $('xx').onclick=()=>{stopEdit(true);const b=XLSX.utils.book_new();
  for(const s of wb.sheets){const base=s.name.replace(/[\[\]:*?\/\\]/g,'_').slice(0,31);let n=base; // xlsx sheet names: 31 chars, unique ignoring case
   for(let k=2;b.SheetNames.some(x=>x.toLowerCase()==n.toLowerCase());k++)n=base.slice(0,26)+' ('+k+')';
   XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(aoa(s,true)),n)}
- dl('disxcel.xlsx',XLSX.write(b,{type:'array',bookType:'xlsx'}),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');refocus()};
-
+ dl('disxcel.xls',XLSX.write(b,{type:'array',bookType:'biff8'}),'application/vnd.ms-excel');refocus()};
 render();refocus();
 function external(t){wb=clean(JSON.parse(t));render()} // book.json changed outside the app, e.g. by the MCP server
 addEventListener('resize',place);
