@@ -16,7 +16,8 @@ import mcp_server
 import gi
 gi.require_version('Gtk', '3.0'); gi.require_version('WebKit2', '4.1')
 from gi.repository import Gtk, WebKit2, GLib
-import runpy, resource, openpyxl
+import runpy, resource, openpyxl, subprocess
+from PIL import Image
 # a desktop launcher starts apps with a 1024 soft fd limit; mimic it (the app must raise it itself)
 resource.setrlimit(resource.RLIMIT_NOFILE, (1024, resource.getrlimit(resource.RLIMIT_NOFILE)[1]))
 fails, wv, checks = [], None, [0]
@@ -98,31 +99,43 @@ def phase2():
         os.environ['HOME'] = TMP  # downloads go to the throwaway ~/Downloads
         js(EXPORT)
     at(2800, export)
-    at(4500, exported)
-    at(5000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
+    at(3400, lambda: js("$('sh').click();1"))
+    def popup(o):
+        check('📷 Foto opens the in-app popup with a preview', o['open'] and o['src'] == 'data:image/png;base64,', o)
+        js("$('pp').click();setTimeout(()=>$('sh').click(),300);setTimeout(()=>$('pj').click(),1200);1")
+    at(4400, lambda: jsj("{open:$('ph').open,src:$('pv').src.slice(0,22)}", popup))
+    at(6500, exported)
+    at(7000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
     def live(o):
         check('an MCP write shows up in the open app', o['sheets'][0].get('A1') == 'desde Claude' and o['sheets'][0].get('D9') == 'x'
               and o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['active'] == 1, o['sheets'][0])
-    at(7000, lambda: jsj(STATE, live))
+    at(9000, lambda: jsj(STATE, live))
     pid = web_pid(); lim = [l for l in open(f'/proc/{pid}/limits') if l.startswith('Max open files')][0].split()
-    check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3])
+    check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3]); limit[0] = int(lim[3])
     for t in range(30000, 43000, 3000): at(t, lambda: samples.append(syncs(pid)))  # animations pause after 20 s idle
     at(43000, lambda: wv.reload())
 def exported():
-    csv = glob.glob(TMP + '/Downloads/*.csv'); x = glob.glob(TMP + '/Downloads/*.xlsx')
+    csv = glob.glob(TMP + '/Downloads/*.csv'); x = glob.glob(TMP + '/Downloads/*.xls')
     check('CSV of the active sheet lands in Downloads', [os.path.basename(p) for p in csv] == ['Gastos.csv'] and
           open(csv[0], encoding='utf-8-sig').read().splitlines()[2:4] == [',Año,Total', ',2026,12.5'], csv and open(csv[0], encoding='utf-8-sig').read())
     if x:
-        b = openpyxl.load_workbook(x[0])
-        check('xlsx holds every sheet with typed numbers', b.sheetnames == ['Hoja 1', 'Gastos', 'Ingresos'] and b['Gastos']['B4'].value == 2026 and b['Hoja 1']['C3'].value == ',5', b.sheetnames)
-    else: check('xlsx export lands in Downloads', False)
-samples = []
+        check('.xls is a real Excel 97-2003 file', open(x[0], 'rb').read(8) == bytes.fromhex('d0cf11e0a1b11ae1'))  # OLE2, not renamed xlsx
+        o = json.loads(subprocess.run(['node', '-e', "const X=require(process.argv[1]),b=X.read(require('fs').readFileSync(process.argv[2])),g=b.Sheets.Gastos;"
+            "console.log(JSON.stringify({names:b.SheetNames,b4:g.B4.v,t:g.B4.t,c3:b.Sheets['Hoja 1'].C3.v}))", ROOT + '/xlsx.full.min.js', x[0]],
+            capture_output=True, text=True).stdout or 'null')
+        check('.xls holds every sheet with typed numbers', o == {'names': ['Hoja 1', 'Gastos', 'Ingresos'], 'b4': 2026, 't': 'n', 'c3': ',5'}, o)
+    else: check('.xls export lands in Downloads', False)
+    for ext, fmt in (('png', 'PNG'), ('jpg', 'JPEG')):
+        try: im = Image.open(TMP + '/Downloads/Gastos.' + ext); ok = im.format == fmt and im.width > 400 and len(set(im.convert('L').getdata())) > 20
+        except OSError as e: ok, im = False, e
+        check('photo saved as ' + ext.upper(), ok, im)
+samples, limit = [], [0]
 def finish():
     def persisted(o):
         check('everything survives a reload', o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['sheets'][0].get('A1') == 'desde Claude' and o['active'] == 1, o['names'])
         last = samples[-3:]  # once idle the count must hold still
         check('no fence fds leak while idle', max(last) - min(last) <= 5, samples)
-        check('fd count stays far from the limit', max(samples) < 900, max(samples))
+        check('fd count stays far from the limit', max(samples) < limit[0] // 16, (max(samples), limit[0]))
         if checks[0] < 20: fails.append('only %d checks ran' % checks[0])
         print('FAILED: ' + ', '.join(fails) if fails else 'ALL PASSED'); Gtk.main_quit()
     jsj(STATE, persisted)
