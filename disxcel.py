@@ -52,8 +52,15 @@ def saved(m, res):
 m.register_script_message_handler('book')
 m.connect('script-message-received::book', saved)
 # ponytail: last writer wins inside the 1 s poll window (typing in the same second as an MCP write); merge per cell if that ever bites
-def poll():  # book.json changed outside the app (the MCP server): show it
-    try: mt = os.stat(book.PATH).st_mtime_ns
+PAGE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'index.html')
+code = [os.stat(PAGE).st_mtime_ns]
+def poll():
+    mt = os.stat(PAGE).st_mtime_ns  # a new version of the app (an update, a git pull): load it so no window runs stale code
+    if mt != code[0]:
+        code[0] = mt
+        v.run_javascript('try{stopEdit(true)}catch{}', None, None)  # the cell being typed is saved first
+        GLib.timeout_add(300, lambda: (v.reload(), False)[1])
+    try: mt = os.stat(book.PATH).st_mtime_ns  # book.json changed outside the app (the MCP server): show it
     except FileNotFoundError: return True
     if mt != last[1]:
         last[1] = mt; t = book.read()
@@ -61,7 +68,7 @@ def poll():  # book.json changed outside the app (the MCP server): show it
             last[0] = t; inject(t); v.run_javascript('external(%s)' % json.dumps(t), None, None)
     return True
 GLib.timeout_add(1000, poll)
-v.load_uri('file://' + os.path.join(os.path.dirname(os.path.realpath(__file__)), 'index.html'))
+v.load_uri('file://' + PAGE)
 w = Gtk.Window(title='Disxcel', default_width=1100, default_height=720)
 w.set_icon_from_file(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icon.png'))
 w.add(v); w.connect('destroy', Gtk.main_quit); w.show_all(); Gtk.main()
