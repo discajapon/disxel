@@ -48,7 +48,8 @@ def xlsx_b64():  # data starting at B3, as real files often do
     b.create_sheet('Ingresos')['A1'] = 'Sueldo'
     f = io.BytesIO(); b.save(f); return base64.b64encode(f.getvalue()).decode()
 
-EDIT = """(()=>{const kd=(k,o={})=>ed.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,...o}));
+EDIT = """(()=>{stopEdit(false);R=0;C=0;place(); // the test window takes desktop focus: a stray key from the user may have moved the selection
+ const kd=(k,o={})=>ed.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,...o}));
  ed.value='hola';ed.dispatchEvent(new InputEvent('input',{bubbles:true}));const editing=ed.classList.contains('on');kd('Enter');
  const after={editing,R,C,a1:sheet().cells.A1};
  kd('ArrowRight');kd('F2');const f2=mode;kd('Escape');
@@ -133,10 +134,18 @@ def phase2():
         check('an MCP write shows up in the open app', o['sheets'][0].get('A1') == 'desde Claude' and o['sheets'][0].get('D9') == 'x'
               and o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['active'] == 1, o['sheets'][0])
     at(11300, lambda: jsj(STATE, live))
+    def bump():  # same code, newer mtime: the open window must reload by itself and keep the cell being typed
+        js("window.__stale=1;R=6;C=0;place();ed.value='a medias';ed.dispatchEvent(new InputEvent('input'));1")
+        GLib.timeout_add(300, lambda: (os.utime(ROOT + '/index.html'), False)[1])
+    at(12000, bump)
+    def reloaded(o):
+        check('a new version of the app reloads the open window', o['stale'] is None, o)
+        check('the cell being typed survives that reload', o['a7'] == 'a medias', o)
+    at(14500, lambda: jsj("{stale:window.__stale??null,a7:sheet().cells.A7??null}", reloaded))
     pid = web_pid(); lim = [l for l in open(f'/proc/{pid}/limits') if l.startswith('Max open files')][0].split()
     check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3]); limit[0] = int(lim[3])
     for t in range(30000, 43000, 3000): at(t, lambda: samples.append(syncs(pid)))  # animations pause after 20 s idle
-    at(43000, lambda: wv.reload())
+    at(43000, lambda: (state.__setitem__(1, True), wv.reload()))  # the final reload; the app may reload on its own before
 def exported():
     csv = glob.glob(TMP + '/Downloads/*.csv'); x = glob.glob(TMP + '/Downloads/*.xls')
     check('CSV of the active sheet lands in Downloads', [os.path.basename(p) for p in csv] == ['Gastos.csv'] and
@@ -183,14 +192,14 @@ def page():
     hid = [wv.connect('load-changed', loaded)]
     wv.load_uri('file://' + TMP + '/Downloads/Gastos.html')
 
-orig, state = WebKit2.WebView.load_uri, [0]
+orig, state = WebKit2.WebView.load_uri, [0, False]
 def lu(self, uri):
     global wv; wv = self
     def done(v, e):
         if e != WebKit2.LoadEvent.FINISHED: return
         state[0] += 1
         if state[0] == 1: at(800, phase2)
-        elif state[0] == 2: at(800, finish)
+        elif state[1]: state[1] = False; at(800, finish)
     self.connect('load-changed', done)
     orig(self, uri)
 WebKit2.WebView.load_uri = lu
