@@ -116,6 +116,12 @@ def phase2():
         check('a new popup goes back to Normal', o['open'] and o['sel'] == 'normal', o['sel'])
         js("$('pj').click();1")
     at(6200, lambda: jsj(PV, reopened))
+    at(6800, lambda: js("""const s=sheet(),o=s.cells.B3;s.cells.B3='palabra '.repeat(80); // in memory only, restored right after
+ photo('normal').then(c=>{window.__wh=[[c.width,c.height]];s.cells.B3=o;return photo('normal')}).then(c=>window.__wh.push([c.width,c.height]));1"""))
+    def wrapped(o):
+        (lw, lh), (sw, sh) = o
+        check('long text wraps in the photo: taller rows, capped width', lh > sh * 1.5 and lw - sw <= 2 * 360, o)
+    at(7300, lambda: jsj('window.__wh', wrapped))
     at(7500, exported)
     at(8000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
     def live(o):
