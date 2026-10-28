@@ -100,16 +100,28 @@ def phase2():
         js(EXPORT)
     at(2800, export)
     at(3400, lambda: js("$('sh').click();1"))
+    PV = "{open:$('ph').open,src:$('pv').src.slice(0,22),len:$('pv').src.length,sel:document.querySelector('#pst .sel')?.dataset.s,styles:[...document.querySelectorAll('#pst button')].map(b=>b.textContent)}"
+    first = {}
     def popup(o):
+        first.update(o)
         check('📷 Foto opens the in-app popup with a preview', o['open'] and o['src'] == 'data:image/png;base64,', o)
-        js("$('pp').click();setTimeout(()=>$('sh').click(),300);setTimeout(()=>$('pj').click(),1200);1")
-    at(4400, lambda: jsj("{open:$('ph').open,src:$('pv').src.slice(0,22)}", popup))
-    at(6500, exported)
-    at(7000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
+        check('the popup offers the styles and starts on Normal', o['styles'] == ['Normal', 'Liquid glass', 'Corporativo', 'Oscuro', 'Minimal'] and o['sel'] == 'normal', o)
+        js("document.querySelector('#pst [data-s=dark]').click();1")
+    at(4400, lambda: jsj(PV, popup))
+    def switched(o):
+        check('picking a style redraws the preview', o['sel'] == 'dark' and o['len'] != first['len'], (o['sel'], o['len'], first['len']))
+        js("$('pp').click();setTimeout(()=>$('sh').click(),300);1")
+    at(5200, lambda: jsj(PV, switched))
+    def reopened(o):
+        check('a new popup goes back to Normal', o['open'] and o['sel'] == 'normal', o['sel'])
+        js("$('pj').click();1")
+    at(6200, lambda: jsj(PV, reopened))
+    at(7500, exported)
+    at(8000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
     def live(o):
         check('an MCP write shows up in the open app', o['sheets'][0].get('A1') == 'desde Claude' and o['sheets'][0].get('D9') == 'x'
               and o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['active'] == 1, o['sheets'][0])
-    at(9000, lambda: jsj(STATE, live))
+    at(10000, lambda: jsj(STATE, live))
     pid = web_pid(); lim = [l for l in open(f'/proc/{pid}/limits') if l.startswith('Max open files')][0].split()
     check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3]); limit[0] = int(lim[3])
     for t in range(30000, 43000, 3000): at(t, lambda: samples.append(syncs(pid)))  # animations pause after 20 s idle
