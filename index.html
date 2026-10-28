@@ -184,43 +184,55 @@ $('xx').onclick=()=>{stopEdit(true);const b=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(aoa(s,true)),n)}
  dl('disxcel.xls',XLSX.write(b,{type:'array',bookType:'biff8'}),'application/vnd.ms-excel');refocus()};
 const bg=Object.assign(new Image(),{src:'bg.jpg'});
-async function photo(){ // the used area of the sheet drawn on blurred glass, like the app
- const s=sheet(),ks=Object.keys(s.cells);if(!ks.length)return null;
+const SERIF='AS,Georgia,serif',SANS='Ubuntu,"Segoe UI",Arial,sans-serif';
+const STYLES={ // photo looks; labels = A B C / 1 2 3 like the grid, head1 = the first row is a header
+ normal:{name:'Normal',font:SERIF,labels:true,bg:'#ffffff',text:'#1f1f1f',head:'#f2f2f2',headText:'#5f5f5f',grid:'#dadada',border:'#bdbdbd',title:'#1f1f1f',radius:0},
+ glass:{name:'Liquid glass',font:SERIF,labels:true,glass:true,panel:'rgba(0,0,0,.22)',text:'#fff',head:'rgba(28,18,52,.85)',headText:'rgba(255,255,255,.75)',grid:'rgba(255,255,255,.12)',border:'rgba(255,255,255,.55)',title:'#fff',radius:16},
+ corp:{name:'Corporativo',font:SANS,head1:true,bg:'#ffffff',text:'#1d2733',head:'#1f3a5f',headText:'#ffffff',zebra:'#f3f6fa',grid:'#e1e7ef',border:'#1f3a5f',title:'#1f3a5f',radius:8},
+ dark:{name:'Oscuro',font:SANS,head1:true,bg:'#0e1014',panel:'#161920',text:'#e6e8ec',head:'#20242e',headText:'#e3c25c',zebra:'#1a1e26',grid:'#2a2f3a',border:'#2a2f3a',title:'#ffffff',radius:14},
+ minimal:{name:'Minimal',font:SERIF,head1:true,bg:'#fbfaf7',text:'#222222',headText:'#111111',grid:'#e6e1d6',rule:'#222222',vlines:false,title:'#111111',radius:0},
+};
+async function photo(st){ // the used area of the sheet as an image in one of STYLES
+ const S=STYLES[st]||STYLES.normal,s=sheet(),ks=Object.keys(s.cells);if(!ks.length)return null;
  await document.fonts.ready;await bg.decode().catch(()=>{});
- const nr=Math.max(...ks.map(k=>+k.slice(1))),nc=Math.max(...ks.map(k=>k.charCodeAt(0)-65))+1,F='15px AS,Georgia,serif';
- const cv=document.createElement('canvas'),x=cv.getContext('2d');x.font=F;
- const ws=[...Array(nc)].map((_,c)=>clamp(Math.max(...[...Array(nr)].map((_,r)=>x.measureText(s.cells[key(r,c)]||'').width))+20,60,360));
- const P=28,T=56,H=32,HW=46,W=P*2+HW+ws.reduce((a,b)=>a+b,0),Ht=P*2+T+H*(nr+1);
+ const nr=Math.max(...ks.map(k=>+k.slice(1))),nc=Math.max(...ks.map(k=>k.charCodeAt(0)-65))+1,F='15px '+S.font,FB='600 15px '+S.font;
+ const cv=document.createElement('canvas'),x=cv.getContext('2d');
+ const ws=[...Array(nc)].map((_,c)=>clamp(Math.max(...[...Array(nr)].map((_,r)=>{x.font=S.head1&&!r?FB:F;return x.measureText(s.cells[key(r,c)]||'').width}))+20,60,360));
+ const L=S.labels,top=L?1:0,P=28,T=56,H=32,HW=L?46:0,W=P*2+HW+ws.reduce((a,b)=>a+b,0),Ht=P*2+T+H*(nr+top);
  const k=Math.min(2,8000/Math.max(W,Ht)); // ponytail: very big sheets get a smaller scale; split into pages if that gets unreadable
  cv.width=W*k;cv.height=Ht*k;x.scale(k,k);
- const cover=(c,w,h,m=0)=>{const r=Math.max((w+2*m)/bg.width,(h+2*m)/bg.height)||0;c.fillStyle='#1b1340';c.fillRect(0,0,w,h);
-  if(r)c.drawImage(bg,(w-bg.width*r)/2,(h-bg.height*r)/2,bg.width*r,bg.height*r)}; // m: bleed so the blur has no dark edges
- if('filter' in x){x.filter='blur(28px) saturate(200%) brightness(.9)';cover(x,W,Ht,60);x.filter='none'} // same recipe as .glass
- else{let c=document.createElement('canvas');c.width=W;c.height=Ht;cover(c.getContext('2d'),W,Ht); // WebKitGTK has no canvas filter:
-  const step=(f,w,h)=>{const n=document.createElement('canvas');n.width=Math.max(1,Math.round(w));n.height=Math.max(1,Math.round(h));
-   const nx=n.getContext('2d');nx.imageSmoothingQuality='high';nx.drawImage(f,0,0,n.width,n.height);return n};
-  for(let d=2;d<=32;d*=2)c=step(c,W/d,Ht/d);for(let d=16;d>=1;d/=2)c=step(c,W/d,Ht/d); // halve 5 times, double back = smooth blur
-  x.drawImage(c,0,0,W,Ht)}
- x.fillStyle='rgba(30,20,50,.45)';x.fillRect(0,0,W,Ht);
- const g0=P+T,gx=P,gw=W-P*2,gh=H*(nr+1);
- x.save();x.beginPath();x.roundRect(gx,g0,gw,gh,16);x.clip();
- x.fillStyle='rgba(0,0,0,.22)';x.fillRect(gx,g0,gw,gh);
- x.fillStyle='rgba(28,18,52,.85)';x.fillRect(gx,g0,gw,H);x.fillRect(gx,g0,HW,gh);
- x.strokeStyle='rgba(255,255,255,.12)';x.lineWidth=1;x.beginPath();
- for(let i=1;i<=nr;i++){x.moveTo(gx,g0+H*i+.5);x.lineTo(gx+gw,g0+H*i+.5)}
- let cx=gx+HW;for(const w of ws){x.moveTo(cx+.5,g0);x.lineTo(cx+.5,g0+gh);cx+=w}x.stroke();x.restore();
- x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=1.5;x.beginPath();x.roundRect(gx,g0,gw,gh,16);x.stroke();
- x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=3;x.shadowOffsetY=1;x.textBaseline='middle';x.fillStyle='#fff';
- x.font='600 28px ASD,AS,Georgia,serif';x.fillText(s.name,P,P+T/2-6);
- x.font='500 12px AS,Georgia,serif';x.fillStyle='rgba(255,255,255,.75)';x.textAlign='center';
- cx=gx+HW;ws.forEach((w,c)=>{x.fillText(col(c),cx+w/2,g0+H/2);cx+=w});
- x.textAlign='right';for(let i=0;i<nr;i++)x.fillText(i+1,gx+HW-8,g0+H*(i+1.5));
- x.font=F;x.fillStyle='#fff';
- for(let i=0;i<nr;i++){cx=gx+HW;ws.forEach((w,c)=>{const v=s.cells[key(i,c)];
-  if(v){x.save();x.beginPath();x.rect(cx,g0+H*(i+1),w,H);x.clip();const n=isNum(v);x.textAlign=n?'right':'left';x.fillText(v,n?cx+w-10:cx+10,g0+H*(i+1.5));x.restore()}cx+=w})}
+ if(S.glass){
+  const cover=(c,w,h,m=0)=>{const r=Math.max((w+2*m)/bg.width,(h+2*m)/bg.height)||0;c.fillStyle='#1b1340';c.fillRect(0,0,w,h);
+   if(r)c.drawImage(bg,(w-bg.width*r)/2,(h-bg.height*r)/2,bg.width*r,bg.height*r)}; // m: bleed so the blur has no dark edges
+  if('filter' in x){x.filter='blur(28px) saturate(200%) brightness(.9)';cover(x,W,Ht,60);x.filter='none'} // same recipe as .glass
+  else{let c=document.createElement('canvas');c.width=W;c.height=Ht;cover(c.getContext('2d'),W,Ht); // WebKitGTK has no canvas filter:
+   const step=(f,w,h)=>{const n=document.createElement('canvas');n.width=Math.max(1,Math.round(w));n.height=Math.max(1,Math.round(h));
+    const nx=n.getContext('2d');nx.imageSmoothingQuality='high';nx.drawImage(f,0,0,n.width,n.height);return n};
+   for(let d=2;d<=32;d*=2)c=step(c,W/d,Ht/d);for(let d=16;d>=1;d/=2)c=step(c,W/d,Ht/d); // halve 5 times, double back = smooth blur
+   x.drawImage(c,0,0,W,Ht)}
+  x.fillStyle='rgba(30,20,50,.45)';x.fillRect(0,0,W,Ht)}
+ else{x.fillStyle=S.bg;x.fillRect(0,0,W,Ht)}
+ const g0=P+T,gx=P,gw=W-P*2,gh=H*(nr+top),y=i=>g0+H*(i+top); // y(i): top of data row i
+ x.save();x.beginPath();x.roundRect(gx,g0,gw,gh,S.radius);x.clip();
+ x.fillStyle=S.panel||S.bg;x.fillRect(gx,g0,gw,gh);
+ if(S.zebra){x.fillStyle=S.zebra;for(let i=S.head1?2:1;i<nr;i+=2)x.fillRect(gx,y(i),gw,H)}
+ if(S.head){x.fillStyle=S.head;if(L){x.fillRect(gx,g0,gw,H);x.fillRect(gx,g0,HW,gh)}else x.fillRect(gx,g0,gw,H)}
+ x.strokeStyle=S.grid;x.lineWidth=1;x.beginPath();
+ for(let i=1;i<nr+top;i++){x.moveTo(gx,g0+H*i+.5);x.lineTo(gx+gw,g0+H*i+.5)}
+ if(S.vlines!==false){let cx=gx+HW;ws.forEach((w,c)=>{if(c||L){x.moveTo(cx+.5,g0);x.lineTo(cx+.5,g0+gh)}cx+=w})}
+ x.stroke();x.restore();
+ if(S.rule){x.fillStyle=S.rule;x.fillRect(gx,g0,gw,2);x.fillRect(gx,g0+H-1,gw,1.5);x.fillRect(gx,g0+gh-2,gw,2)} // book-style rules
+ if(S.border){x.strokeStyle=S.border;x.lineWidth=S.glass?1.5:1;x.beginPath();x.roundRect(gx+.5,g0+.5,gw-1,gh-1,S.radius);x.stroke()}
+ if(S.glass){x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=3;x.shadowOffsetY=1}
+ x.textBaseline='middle';x.textAlign='left';x.fillStyle=S.title;x.font='600 28px '+(S.font==SERIF?'ASD,':'')+S.font;x.fillText(s.name,P,P+T/2-6);
+ if(L){x.font='500 12px '+S.font;x.fillStyle=S.headText;x.textAlign='center';let cx=gx+HW;ws.forEach((w,c)=>{x.fillText(col(c),cx+w/2,g0+H/2);cx+=w});
+  x.textAlign='right';for(let i=0;i<nr;i++)x.fillText(i+1,gx+HW-8,y(i)+H/2)}
+ for(let i=0;i<nr;i++){const hd=S.head1&&!i;x.font=hd?FB:F;x.fillStyle=hd?S.headText:S.text;let cx=gx+HW;
+  ws.forEach((w,c)=>{const v=s.cells[key(i,c)];
+   if(v){x.save();x.beginPath();x.rect(cx,y(i),w,H);x.clip();const n=!hd&&isNum(v);x.textAlign=n?'right':'left';x.fillText(v,n?cx+w-10:cx+10,y(i)+H/2);x.restore()}cx+=w})}
  return cv}
 let shotCv=null;
-$('sh').onclick=async()=>{stopEdit(true);shotCv=await photo();if(!shotCv){toast('La hoja está vacía');return refocus()}
+$('sh').onclick=async()=>{stopEdit(true);shotCv=await photo('normal');if(!shotCv){toast('La hoja está vacía');return refocus()}
  $('pv').src=shotCv.toDataURL();$('ph').showModal()};
 const savePhoto=(t,ext)=>{shotCv.toBlob(b=>dl(sheet().name.replace(/[\/\\]/g,'_')+'.'+ext,b,t),t,.92);$('ph').close()};
 $('pp').onclick=()=>savePhoto('image/png','png');$('pj').onclick=()=>savePhoto('image/jpeg','jpg');
