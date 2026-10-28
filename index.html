@@ -176,6 +176,42 @@ $('xx').onclick=()=>{stopEdit(true);const b=XLSX.utils.book_new();
   for(let k=2;b.SheetNames.some(x=>x.toLowerCase()==n.toLowerCase());k++)n=base.slice(0,26)+' ('+k+')';
   XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(aoa(s,true)),n)}
  dl('disxcel.xls',XLSX.write(b,{type:'array',bookType:'biff8'}),'application/vnd.ms-excel');refocus()};
+const bg=Object.assign(new Image(),{src:'bg.jpg'});
+async function photo(){ // the used area of the sheet drawn on blurred glass, like the app
+ const s=sheet(),ks=Object.keys(s.cells);if(!ks.length)return null;
+ await document.fonts.ready;await bg.decode().catch(()=>{});
+ const nr=Math.max(...ks.map(k=>+k.slice(1))),nc=Math.max(...ks.map(k=>k.charCodeAt(0)-65))+1,F='15px AS,Georgia,serif';
+ const cv=document.createElement('canvas'),x=cv.getContext('2d');x.font=F;
+ const ws=[...Array(nc)].map((_,c)=>clamp(Math.max(...[...Array(nr)].map((_,r)=>x.measureText(s.cells[key(r,c)]||'').width))+20,60,360));
+ const P=28,T=56,H=32,HW=46,W=P*2+HW+ws.reduce((a,b)=>a+b,0),Ht=P*2+T+H*(nr+1);
+ const k=Math.min(2,8000/Math.max(W,Ht)); // ponytail: very big sheets get a smaller scale; split into pages if that gets unreadable
+ cv.width=W*k;cv.height=Ht*k;x.scale(k,k);
+ const cover=(c,w,h,m=0)=>{const r=Math.max((w+2*m)/bg.width,(h+2*m)/bg.height)||0;c.fillStyle='#1b1340';c.fillRect(0,0,w,h);
+  if(r)c.drawImage(bg,(w-bg.width*r)/2,(h-bg.height*r)/2,bg.width*r,bg.height*r)}; // m: bleed so the blur has no dark edges
+ if('filter' in x){x.filter='blur(28px) saturate(200%) brightness(.9)';cover(x,W,Ht,60);x.filter='none'} // same recipe as .glass
+ else{let c=document.createElement('canvas');c.width=W;c.height=Ht;cover(c.getContext('2d'),W,Ht); // WebKitGTK has no canvas filter:
+  const step=(f,w,h)=>{const n=document.createElement('canvas');n.width=Math.max(1,Math.round(w));n.height=Math.max(1,Math.round(h));
+   const nx=n.getContext('2d');nx.imageSmoothingQuality='high';nx.drawImage(f,0,0,n.width,n.height);return n};
+  for(let d=2;d<=32;d*=2)c=step(c,W/d,Ht/d);for(let d=16;d>=1;d/=2)c=step(c,W/d,Ht/d); // halve 5 times, double back = smooth blur
+  x.drawImage(c,0,0,W,Ht)}
+ x.fillStyle='rgba(30,20,50,.45)';x.fillRect(0,0,W,Ht);
+ const g0=P+T,gx=P,gw=W-P*2,gh=H*(nr+1);
+ x.save();x.beginPath();x.roundRect(gx,g0,gw,gh,16);x.clip();
+ x.fillStyle='rgba(0,0,0,.22)';x.fillRect(gx,g0,gw,gh);
+ x.fillStyle='rgba(28,18,52,.85)';x.fillRect(gx,g0,gw,H);x.fillRect(gx,g0,HW,gh);
+ x.strokeStyle='rgba(255,255,255,.12)';x.lineWidth=1;x.beginPath();
+ for(let i=1;i<=nr;i++){x.moveTo(gx,g0+H*i+.5);x.lineTo(gx+gw,g0+H*i+.5)}
+ let cx=gx+HW;for(const w of ws){x.moveTo(cx+.5,g0);x.lineTo(cx+.5,g0+gh);cx+=w}x.stroke();x.restore();
+ x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=1.5;x.beginPath();x.roundRect(gx,g0,gw,gh,16);x.stroke();
+ x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=3;x.shadowOffsetY=1;x.textBaseline='middle';x.fillStyle='#fff';
+ x.font='600 28px ASD,AS,Georgia,serif';x.fillText(s.name,P,P+T/2-6);
+ x.font='500 12px AS,Georgia,serif';x.fillStyle='rgba(255,255,255,.75)';x.textAlign='center';
+ cx=gx+HW;ws.forEach((w,c)=>{x.fillText(col(c),cx+w/2,g0+H/2);cx+=w});
+ x.textAlign='right';for(let i=0;i<nr;i++)x.fillText(i+1,gx+HW-8,g0+H*(i+1.5));
+ x.font=F;x.fillStyle='#fff';
+ for(let i=0;i<nr;i++){cx=gx+HW;ws.forEach((w,c)=>{const v=s.cells[key(i,c)];
+  if(v){x.save();x.beginPath();x.rect(cx,g0+H*(i+1),w,H);x.clip();const n=isNum(v);x.textAlign=n?'right':'left';x.fillText(v,n?cx+w-10:cx+10,g0+H*(i+1.5));x.restore()}cx+=w})}
+ return cv}
 render();refocus();
 function external(t){wb=clean(JSON.parse(t));render()} // book.json changed outside the app, e.g. by the MCP server
 addEventListener('resize',place);
