@@ -55,7 +55,7 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 #tabs{display:flex;gap:6px;margin-top:10px;padding:6px 2px 2px;overflow-x:auto}
 #tabs button{flex:none;display:flex;align-items:center;gap:6px}
 #tabs .pop{animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
-#tabs .sel,#pst .sel{background:rgba(255,255,255,.42);box-shadow:0 0 16px rgba(255,255,255,.35),inset 0 1px 1px rgba(255,255,255,.8)}
+#tabs .sel,#pst .sel,#pm .sel{background:rgba(255,255,255,.42);box-shadow:0 0 16px rgba(255,255,255,.35),inset 0 1px 1px rgba(255,255,255,.8)}
 #tabs .x{padding:0 5px;border-radius:8px;font-size:.8em;opacity:.75;transition:background .25s,opacity .25s}
 #tabs .x:hover{opacity:1;background:rgba(255,255,255,.25)}
 #tabs .x.armed{opacity:1;background:rgba(251,113,133,.6)}
@@ -64,18 +64,19 @@ th.on{color:#fff;background:rgba(110,90,165,.9);box-shadow:inset 0 0 14px rgba(2
 #toast{position:fixed;z-index:10;bottom:28px;left:50%;translate:-50% 20px;opacity:0;padding:10px 18px;border-radius:18px;pointer-events:none;
  text-shadow:0 1px 3px rgba(0,0,0,.6);transition:opacity .35s,translate .45s cubic-bezier(.34,1.56,.64,1)}
 #toast.on{opacity:1;translate:-50% 0}
-dialog.glass{position:fixed;width:min(560px,92vw);padding:22px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+dialog.glass{position:fixed;width:min(720px,92vw);padding:22px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
 dialog::backdrop{background:rgba(15,8,40,.35);backdrop-filter:blur(3px)}
 #ph h2{margin:0 0 12px;font:600 1.4em ASD,AS,Georgia,serif}
 #ph img{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:14px;background:rgba(0,0,0,.25);box-shadow:0 8px 24px rgba(0,0,0,.35)}
 #ph .row{display:flex;gap:8px;margin-top:16px}
-#pst{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+#pst,#pm{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+#pd{display:block;width:100%;height:50vh;border:0;border-radius:14px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 html.idle *,html.idle *::before,html.idle *::after{animation-play-state:paused!important} /* no frames while nobody is looking */
 </style>
 <main class="glass">
 <header><h1>Disxcel</h1><span id=ref>A1</span><span style=flex:1></span>
  <button id=op title="Abrir .xlsx, .ods o .csv (cada hoja entra como pestaña nueva)">📂 Abrir</button><input type=file id=fi accept=".xlsx,.xls,.ods,.csv" hidden>
- <button id=xc title="Exportar la hoja actual">⬇ CSV</button><button id=xx title="Exportar todas las hojas a Excel 97–2003">⬇ .xls</button><button id=sh title="Guardar la hoja como imagen">📷 Foto</button></header>
+ <button id=xc title="Exportar la hoja actual">⬇ CSV</button><button id=xx title="Exportar todas las hojas a Excel 97–2003">⬇ .xls</button><button id=sh title="Exportar la hoja como foto o como documento">⬇ Exportar</button></header>
 <div class=sc id=sc><div class=in>
  <table><thead id=hd></thead><tbody id=tb></tbody></table>
  <div id=sel></div><input id=ed autocomplete=off spellcheck=false>
@@ -83,8 +84,10 @@ html.idle *,html.idle *::before,html.idle *::after{animation-play-state:paused!i
 <nav id=tabs></nav>
 </main>
 <div id=toast class=glass></div>
-<dialog id=ph class=glass><h2>Exportar como foto</h2><nav id=pst></nav><img id=pv alt="Vista previa">
- <div class=row><button id=pc>Cancelar</button><span style=flex:1></span><button id=pp>⬇ PNG</button><button id=pj>⬇ JPG</button></div></dialog>
+<dialog id=ph class=glass><h2>Exportar</h2><nav id=pm><button data-m=foto>📷 Foto</button><button data-m=doc>📄 Documento</button></nav>
+ <div id=pfoto><nav id=pst></nav><img id=pv alt="Vista previa"></div>
+ <div id=pdoc hidden><iframe id=pd sandbox="allow-scripts allow-popups" title="Vista previa del documento"></iframe></div>
+ <div class=row><button id=pc>Cancelar</button><span style=flex:1></span><button id=pp>⬇ PNG</button><button id=pj>⬇ JPG</button><button id=ph5 hidden>⬇ .html</button></div></dialog>
 <script src="xlsx.full.min.js"></script>
 <script>
 const $=i=>document.getElementById(i),tb=$('tb'),ed=$('ed'),sc=$('sc');
@@ -244,7 +247,7 @@ async function preview(st){const n=++shotN; // fast clicks: only the last style 
  const cv=await photo(st);if(n!=shotN)return;shotCv=cv;$('pv').src=cv.toDataURL()}
 $('pst').onclick=e=>{const b=e.target.closest('button');if(b)preview(b.dataset.s)};
 $('sh').onclick=async()=>{stopEdit(true);if(!Object.keys(sheet().cells).length){toast('La hoja está vacía');return refocus()}
- await preview('normal');$('ph').showModal()}; // every popup starts on Normal
+ setMode('foto');await preview('normal');$('ph').showModal()}; // every popup starts on Foto, style Normal
 const savePhoto=(t,ext)=>{shotCv.toBlob(b=>dl(sheet().name.replace(/[\/\\]/g,'_')+'.'+ext,b,t),t,.92);$('ph').close()};
 $('pp').onclick=()=>savePhoto('image/png','png');$('pj').onclick=()=>savePhoto('image/jpeg','jpg');
 $('pc').onclick=()=>$('ph').close();$('ph').onclose=refocus;
@@ -321,6 +324,11 @@ function docHtml(s){ // the used block of the sheet as a self-contained page; it
 <tbody>${body.map(r=>'<tr>'+r.map((v,c)=>`<td${isN[c]?' class=n':''}><div class="v${v.length<=24&&!v.includes('\n')?' nw':''}">${linkify(v)}</div></td>`).join('')+'</tr>').join('\n')}</tbody></table></main>
 <footer>Toca una columna para ordenar · “Ver más” abre los textos largos</footer>
 <script>(${docScript})()</`+`script></html>`}
+const setMode=m=>{for(const b of document.querySelectorAll('#pm button'))b.classList.toggle('sel',b.dataset.m==m);
+ $('pfoto').hidden=$('pp').hidden=$('pj').hidden=m!='foto';$('pdoc').hidden=$('ph5').hidden=m!='doc';
+ if(m=='doc')$('pd').srcdoc=docHtml(sheet())}; // the preview is the real page, so it can be tried before saving
+$('pm').onclick=e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m)};
+$('ph5').onclick=()=>{dl(sheet().name.replace(/[\/\\]/g,'_')+'.html',docHtml(sheet()),'text/html');$('ph').close()};
 
 render();refocus();
 function external(t){wb=clean(JSON.parse(t));render()} // book.json changed outside the app, e.g. by the MCP server
