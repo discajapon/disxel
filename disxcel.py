@@ -27,6 +27,7 @@ def save(dl, name):  # exports land in ~/Downloads, never overwriting
     return True
 ctx.connect('download-started', lambda c, dl: dl.connect('decide-destination', save))
 v = WebKit2.WebView.new_with_context(ctx)
+v.get_settings().set_allow_file_access_from_file_urls(True)  # so the photo export can paint bg.jpg on a canvas without tainting it
 def policy(v, dec, kind):  # web links open in the default browser, not inside the app
     if kind in (WebKit2.PolicyDecisionType.NAVIGATION_ACTION, WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION):
         uri = dec.get_navigation_action().get_request().get_uri()
