@@ -12,7 +12,9 @@ A small spreadsheet for Ubuntu with a liquid glass look, sibling of [Disctask](h
 ## Files
 - 📂 Abrir reads `.xlsx`, `.xls`, `.ods` or `.csv`; each sheet becomes a new tab (cells keep their place, values come in as displayed text).
 - ⬇ CSV saves the current sheet, ⬇ .xls saves the whole book as a real Excel 97–2003 file (plain numbers stay numbers).
-- 📷 Foto opens an in-app popup with a preview of the sheet; tabs switch the style (Normal, the default every time, Liquid glass, Corporativo, Oscuro, Minimal). Long text wraps onto extra lines in the image so nothing is cut (the app grid is unchanged). Save it as PNG or JPG.
+- ⬇ Exportar opens an in-app popup with two tabs.
+  - 📄 Documento saves the sheet as a self-contained `.html` page (sterile white, opens in any browser): live search that ignores accents, click a column to sort (rows glide into place, `12.500` sorts as a number), long texts folded behind “Ver más” that expand with an animation, “Expandir todo”, clickable links, and a print layout with everything open. The preview in the popup is the real page. Its first non-empty row is the header.
+  - 📷 Foto shows a preview of the sheet; tabs switch the style (Normal, the default every time, Liquid glass, Corporativo, Oscuro, Minimal). Long text wraps onto extra lines in the image so nothing is cut (the app grid is unchanged). Save it as PNG or JPG.
 - Everything goes to `~/Downloads` and never overwrites an existing file.
 - Uses the bundled [SheetJS](https://sheetjs.com) 0.20.3 (`xlsx.full.min.js`, Apache-2.0); nothing touches the network.
 
