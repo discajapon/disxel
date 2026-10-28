@@ -199,7 +199,12 @@ async function photo(st){ // the used area of the sheet as an image in one of ST
  const nr=Math.max(...ks.map(k=>+k.slice(1))),nc=Math.max(...ks.map(k=>k.charCodeAt(0)-65))+1,F='15px '+S.font,FB='600 15px '+S.font;
  const cv=document.createElement('canvas'),x=cv.getContext('2d');
  const ws=[...Array(nc)].map((_,c)=>clamp(Math.max(...[...Array(nr)].map((_,r)=>{x.font=S.head1&&!r?FB:F;return x.measureText(s.cells[key(r,c)]||'').width}))+20,60,360));
- const L=S.labels,top=L?1:0,P=28,T=56,H=32,HW=L?46:0,W=P*2+HW+ws.reduce((a,b)=>a+b,0),Ht=P*2+T+H*(nr+top);
+ const wrap=(v,w)=>v.split('\n').flatMap(par=>{const out=[];let ln=''; // greedy word wrap; a word wider than the column is cut by letters
+  for(const word of par.split(/(?<=\s)/)){const t=ln+word;if(!ln||x.measureText(t.trimEnd()).width<=w){ln=t;continue}out.push(ln.trimEnd());ln=word}
+  out.push(ln.trimEnd());return out.flatMap(l=>{const r=[];let c='';for(const ch of l){if(c&&x.measureText(c+ch).width>w){r.push(c);c=''}c+=ch}r.push(c);return r})});
+ const LH=20,txt=[...Array(nr)].map((_,r)=>ws.map((w,c)=>{x.font=S.head1&&!r?FB:F;return wrap(s.cells[key(r,c)]||'',w-20)})); // every cell's lines
+ const L=S.labels,top=L?1:0,P=28,T=56,H=32,HW=L?46:0,rh=txt.map(row=>Math.max(H,...row.map(l=>l.length*LH+12)));
+ const W=P*2+HW+ws.reduce((a,b)=>a+b,0),Ht=P*2+T+H*top+rh.reduce((a,b)=>a+b,0);
  const k=Math.min(2,8000/Math.max(W,Ht)); // ponytail: very big sheets get a smaller scale; split into pages if that gets unreadable
  cv.width=W*k;cv.height=Ht*k;x.scale(k,k);
  if(S.glass){
@@ -213,24 +218,24 @@ async function photo(st){ // the used area of the sheet as an image in one of ST
    x.drawImage(c,0,0,W,Ht)}
   x.fillStyle='rgba(30,20,50,.45)';x.fillRect(0,0,W,Ht)}
  else{x.fillStyle=S.bg;x.fillRect(0,0,W,Ht)}
- const g0=P+T,gx=P,gw=W-P*2,gh=H*(nr+top),y=i=>g0+H*(i+top); // y(i): top of data row i
+ const g0=P+T,gx=P,gw=W-P*2,gh=Ht-P*2-T,ys=rh.reduce((a,h)=>[...a,a.at(-1)+h],[g0+H*top]),y=i=>ys[i]; // y(i): top of data row i
  x.save();x.beginPath();x.roundRect(gx,g0,gw,gh,S.radius);x.clip();
  x.fillStyle=S.panel||S.bg;x.fillRect(gx,g0,gw,gh);
- if(S.zebra){x.fillStyle=S.zebra;for(let i=S.head1?2:1;i<nr;i+=2)x.fillRect(gx,y(i),gw,H)}
- if(S.head){x.fillStyle=S.head;if(L){x.fillRect(gx,g0,gw,H);x.fillRect(gx,g0,HW,gh)}else x.fillRect(gx,g0,gw,H)}
+ if(S.zebra){x.fillStyle=S.zebra;for(let i=S.head1?2:1;i<nr;i+=2)x.fillRect(gx,y(i),gw,rh[i])}
+ if(S.head){x.fillStyle=S.head;if(L){x.fillRect(gx,g0,gw,H);x.fillRect(gx,g0,HW,gh)}else x.fillRect(gx,g0,gw,rh[0])}
  x.strokeStyle=S.grid;x.lineWidth=1;x.beginPath();
- for(let i=1;i<nr+top;i++){x.moveTo(gx,g0+H*i+.5);x.lineTo(gx+gw,g0+H*i+.5)}
+ for(let i=top?0:1;i<nr;i++){x.moveTo(gx,y(i)+.5);x.lineTo(gx+gw,y(i)+.5)}
  if(S.vlines!==false){let cx=gx+HW;ws.forEach((w,c)=>{if(c||L){x.moveTo(cx+.5,g0);x.lineTo(cx+.5,g0+gh)}cx+=w})}
  x.stroke();x.restore();
- if(S.rule){x.fillStyle=S.rule;x.fillRect(gx,g0,gw,2);x.fillRect(gx,g0+H-1,gw,1.5);x.fillRect(gx,g0+gh-2,gw,2)} // book-style rules
+ if(S.rule){x.fillStyle=S.rule;x.fillRect(gx,g0,gw,2);x.fillRect(gx,y(1)-1,gw,1.5);x.fillRect(gx,g0+gh-2,gw,2)} // book-style rules
  if(S.border){x.strokeStyle=S.border;x.lineWidth=S.glass?1.5:1;x.beginPath();x.roundRect(gx+.5,g0+.5,gw-1,gh-1,S.radius);x.stroke()}
  if(S.glass){x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=3;x.shadowOffsetY=1}
  x.textBaseline='middle';x.textAlign='left';x.fillStyle=S.title;x.font='600 28px '+(S.font==SERIF?'ASD,':'')+S.font;x.fillText(s.name,P,P+T/2-6);
  if(L){x.font='500 12px '+S.font;x.fillStyle=S.headText;x.textAlign='center';let cx=gx+HW;ws.forEach((w,c)=>{x.fillText(col(c),cx+w/2,g0+H/2);cx+=w});
-  x.textAlign='right';for(let i=0;i<nr;i++)x.fillText(i+1,gx+HW-8,y(i)+H/2)}
+  x.textAlign='right';for(let i=0;i<nr;i++)x.fillText(i+1,gx+HW-8,y(i)+rh[i]/2)}
  for(let i=0;i<nr;i++){const hd=S.head1&&!i;x.font=hd?FB:F;x.fillStyle=hd?S.headText:S.text;let cx=gx+HW;
-  ws.forEach((w,c)=>{const v=s.cells[key(i,c)];
-   if(v){x.save();x.beginPath();x.rect(cx,y(i),w,H);x.clip();const n=!hd&&isNum(v);x.textAlign=n?'right':'left';x.fillText(v,n?cx+w-10:cx+10,y(i)+H/2);x.restore()}cx+=w})}
+  ws.forEach((w,c)=>{const v=s.cells[key(i,c)],ls=txt[i][c],t0=y(i)+(rh[i]-ls.length*LH)/2+LH/2; // lines centred in the row
+   if(v){const n=!hd&&isNum(v);x.textAlign=n?'right':'left';ls.forEach((l,j)=>x.fillText(l,n?cx+w-10:cx+10,t0+j*LH))}cx+=w})}
  return cv}
 let shotCv=null,shotN=0;
 $('pst').innerHTML=Object.entries(STYLES).map(([k,v])=>`<button data-s=${k}>${v.name}</button>`).join('');
