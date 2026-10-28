@@ -122,12 +122,17 @@ def phase2():
         (lw, lh), (sw, sh) = o
         check('long text wraps in the photo: taller rows, capped width', lh > sh * 1.5 and lw - sw <= 2 * 360, o)
     at(7300, lambda: jsj('window.__wh', wrapped))
-    at(7500, exported)
-    at(8000, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
+    at(7400, lambda: js("setCell(3,3,'Nota larga: ' + 'revisión del contrato y llamar antes de las once '.repeat(8) + '<b>no</b></script><i>x</i>');$('sh').click();setTimeout(()=>document.querySelector('#pm [data-m=doc]').click(),600);1"))
+    def doc(o):
+        check('📄 Documento previews the real page', o['table'] and o['title'] and o['h5'] and o['nophoto'], o)
+        js("$('ph5').click();1")
+    at(8300, lambda: jsj("{table:$('pd').srcdoc.includes('<table'),title:$('pd').srcdoc.includes('<h1>Gastos</h1>'),h5:!$('ph5').hidden,nophoto:$('pp').hidden&&$('pfoto').hidden}", doc))
+    at(8800, exported)
+    at(9300, lambda: mcp_server.write_cells('Hoja 1', {'A1': 'desde Claude', 'D9': 'x'}))
     def live(o):
         check('an MCP write shows up in the open app', o['sheets'][0].get('A1') == 'desde Claude' and o['sheets'][0].get('D9') == 'x'
               and o['names'] == ['Hoja 1', 'Gastos', 'Ingresos'] and o['active'] == 1, o['sheets'][0])
-    at(10000, lambda: jsj(STATE, live))
+    at(11300, lambda: jsj(STATE, live))
     pid = web_pid(); lim = [l for l in open(f'/proc/{pid}/limits') if l.startswith('Max open files')][0].split()
     check('web process has a high fd limit', int(lim[3]) >= 65536, lim[3]); limit[0] = int(lim[3])
     for t in range(30000, 43000, 3000): at(t, lambda: samples.append(syncs(pid)))  # animations pause after 20 s idle
@@ -143,6 +148,10 @@ def exported():
             capture_output=True, text=True).stdout or 'null')
         check('.xls holds every sheet with typed numbers', o == {'names': ['Hoja 1', 'Gastos', 'Ingresos'], 'b4': 2026, 't': 'n', 'c3': ',5'}, o)
     else: check('.xls export lands in Downloads', False)
+    h = glob.glob(TMP + '/Downloads/*.html')
+    page = open(h[0], encoding='utf-8').read() if h else ''
+    check('.html document lands in Downloads', [os.path.basename(p) for p in h] == ['Gastos.html'] and '<title>Gastos</title>' in page)
+    check('cell text cannot break out of the page', page.count('</script>') == 1 and '&#60;b&#62;no&#60;/b&#62;&#60;/script&#62;' in page)
     for ext, fmt in (('png', 'PNG'), ('jpg', 'JPEG')):
         try: im = Image.open(TMP + '/Downloads/Gastos.' + ext); ok = im.format == fmt and im.width > 400 and len(set(im.convert('L').getdata())) > 20
         except OSError as e: ok, im = False, e
@@ -154,9 +163,25 @@ def finish():
         last = samples[-3:]  # once idle the count must hold still
         check('no fence fds leak while idle', max(last) - min(last) <= 5, samples)
         check('fd count stays far from the limit', max(samples) < limit[0] // 16, (max(samples), limit[0]))
-        if checks[0] < 20: fails.append('only %d checks ran' % checks[0])
-        print('FAILED: ' + ', '.join(fails) if fails else 'ALL PASSED'); Gtk.main_quit()
+        page()  # last: open the exported document itself and use it
     jsj(STATE, persisted)
+def page():
+    def try_it(o):
+        check('the document opens with long text folded behind "Ver más"', o['more'] == 1 and o['errs'] == [] and o['cnt'] == '1 fila', o)
+        check('"Ver más" expands the text with an animation', o['open'] and o['grew'] and o['anim'], o)
+        check('search filters rows, ignoring accents', o['found'] == ['2026'] and o['none'] == [] and o['cnt2'] == '0 de 1 fila', o)
+        if checks[0] < 30: fails.append('only %d checks ran' % checks[0])
+        print('FAILED: ' + ', '.join(fails) if fails else 'ALL PASSED'); Gtk.main_quit()
+    def loaded(v, e):
+        if e != WebKit2.LoadEvent.FINISHED: return
+        v.disconnect(hid[0])
+        at(900, lambda: js("""window.__e=window.__e||[];const v=document.querySelector('.clip'),h=v.offsetHeight,cnt0=cnt.textContent;document.querySelector('.more').click();
+ const anim=getComputedStyle(v).transitionProperty.includes('max-height');const vis=()=>[...document.querySelectorAll('tbody tr')].filter(r=>!r.hidden).map(r=>r.cells[0].textContent);q.value='REVISION';q.dispatchEvent(new Event('input'));const found=vis();q.value='zzz';q.dispatchEvent(new Event('input'));
+ window.__o={more:document.querySelectorAll('.more').length,errs:__e,cnt:cnt0,open:v.classList.contains('open'),anim,h0:h,
+  found,none:vis(),cnt2:cnt.textContent};
+ q.value='';q.dispatchEvent(new Event('input'));setTimeout(()=>window.__o.grew=v.offsetHeight>h+10,700);1""", lambda r: at(1000, lambda: jsj('window.__o', try_it))))
+    hid = [wv.connect('load-changed', loaded)]
+    wv.load_uri('file://' + TMP + '/Downloads/Gastos.html')
 
 orig, state = WebKit2.WebView.load_uri, [0]
 def lu(self, uri):
