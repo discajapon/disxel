@@ -23,7 +23,7 @@ Needs GTK3 + WebKit2GTK (`gir1.2-webkit2-4.1`).
 
     ./disxcel.py
 
-The book lives in `~/.local/share/disxcel/book.json`, saved on every change. If it is ever unreadable it is kept as `book.json.corrupt` instead of being lost. When something else changes the file (the MCP server below), an open window shows the change within a second.
+The book lives in `~/.local/share/disxcel/book.json`, saved on every change. If it is ever unreadable it is kept as `book.json.corrupt` instead of being lost. When something else changes the file (the MCP server below), an open window shows the change within a second. When the app itself is updated (`index.html` changes), an open window reloads within a second, saving the cell being typed first, so it never runs an old version.
 
 Like Disctask, the app forces WebKit's GPU renderer when OpenGL works (`WEBKIT_FORCE_DMABUF_RENDERER=0 ./disxcel.py` to opt out). That renderer leaks one fd per frame, so the launcher raises the fd limit, endless animations pause after 20 s idle or when unfocused, and a dead web process is reloaded.
 
